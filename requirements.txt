@@ -1,0 +1,22 @@
+# GUI Framework (choose ONE; PyQt is more professional for this project)
+PyQt6>=6.6.0
+
+# Command execution & system interaction
+psutil>=5.9.0
+
+# Parsing & data handling
+lxml>=5.1.0
+pyyaml>=6.0.1
+
+# Reporting & data analysis
+pandas>=2.1.0
+tabulate>=0.9.0
+
+# JSON schema validation (optional but professional)
+jsonschema>=4.21.0
+
+# Logging & rich console output (nice for debugging)
+rich>=13.7.0
+
+# Cross-platform file dialogs & paths
+platformdirs>=4.2.0
