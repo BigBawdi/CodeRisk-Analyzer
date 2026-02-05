@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<results version="2">
+  <cppcheck version="2.13"/>
+  <errors>
+    <error
+      id="memleak"
+      severity="error"
+      msg="Memory leak: ptr"
+      verbose="Memory leak: ptr is not freed"
+      cwe="401"
+      file="main.cpp"
+      line="42">
+    </error>
+
+    <error
+      id="unusedVariable"
+      severity="style"
+      msg="Unused variable: x"
+      verbose="The variable 'x' is never used"
+      file="utils.cpp"
+      line="10">
+    </error>
+  </errors>
+</results>
