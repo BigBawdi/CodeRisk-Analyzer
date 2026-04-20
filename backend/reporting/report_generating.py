@@ -4,7 +4,7 @@ import csv
 import os
 from io import StringIO
 from datetime import datetime
-from .vulnerability import Vulnerability
+from vulnerability import Vulnerability
 
 class ReportGenerator:
     def __init__(self,vulenrabilities, title="CodeRisk Report"):
