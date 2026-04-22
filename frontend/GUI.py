@@ -20,7 +20,7 @@ class CodeRiskAnalyzerGUI(QWidget):
         self.results_text.setReadOnly(True)
         self.Layout.addWidget(self.file_label)
         self.Layout.addWidget(self.file_button)
-        self.Layout.addWidget(self.tool_Label)
+        self.Layout.addWidget(self.tool_label)
         self.Layout.addWidget(self.tool_combo)
         self.Layout.addWidget(self.analyze_button)
         self.Layout.addWidget(self.results_text)
