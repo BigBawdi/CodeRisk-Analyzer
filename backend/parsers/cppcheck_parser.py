@@ -1,21 +1,3 @@
-"""
-parsers/cppcheck_parser.py
-
-Provides two things:
-
-1. parse_cppcheck_xml(xml_path) — your original standalone function,
-   kept exactly as-is so nothing that already calls it breaks.
-
-2. CppcheckParser — a BaseParser subclass that wraps the function above.
-   This is what AnalyzerService (and any future orchestrator) uses.
-
-Why keep the standalone function?
-----------------------------------
-Your existing tests import parse_cppcheck_xml directly.  Wrapping rather
-than replacing means zero breakage.  The class is a thin adapter — all
-real logic stays in one place (the function).
-"""
-
 import xml.etree.ElementTree as ET
 from typing import Any, List
 
@@ -30,25 +12,7 @@ from backend.normalization.type_mapper import map_vulnerability_type
 # ---------------------------------------------------------------------------
 
 def parse_cppcheck_xml(xml_path: str) -> List[Vulnerability]:
-    """
-    Parse a Cppcheck XML result file and return a list of Vulnerability objects.
 
-    Parameters
-    ----------
-    xml_path : str
-        Path to the XML file produced by:
-            cppcheck --xml --xml-version=2 <target>
-
-    Returns
-    -------
-    List[Vulnerability]
-        One entry per <error> element found in the XML.
-
-    Raises
-    ------
-    FileNotFoundError : if xml_path does not exist.
-    ValueError        : if the file is not valid XML.
-    """
     try:
         tree = ET.parse(xml_path)
     except FileNotFoundError:
@@ -90,36 +54,9 @@ def parse_cppcheck_xml(xml_path: str) -> List[Vulnerability]:
 # ---------------------------------------------------------------------------
 
 class CppcheckParser(BaseParser):
-    """
-    BaseParser implementation for Cppcheck.
-
-    Usage
-    -----
-        parser = CppcheckParser()
-        vulns  = parser.safe_parse("/tmp/cppcheck_output.xml")
-        print(parser.summary(vulns))
-
-    What parse() expects
-    --------------------
-    raw_data : str
-        Path to a Cppcheck XML output file (v1 or v2).
-    """
-
     tool_name = "cppcheck"
 
     def parse(self, raw_data: Any) -> List[Vulnerability]:
-        """
-        Delegate to parse_cppcheck_xml().
-
-        Parameters
-        ----------
-        raw_data : str
-            File path to the Cppcheck XML output.
-
-        Returns
-        -------
-        List[Vulnerability]
-        """
         if not isinstance(raw_data, str):
             raise ValueError(
                 f"CppcheckParser expects a file path (str), "

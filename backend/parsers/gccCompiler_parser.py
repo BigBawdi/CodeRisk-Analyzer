@@ -1,96 +1,146 @@
-"""
-parsers/gcc_analyzer_parser.py
-"""
+from __future__ import annotations
 
-import re
-import os
-from typing import Any, List, Optional
+import json
+import logging
+from pathlib import Path
+from typing import List, Optional
 
-from backend.parsers.base_parser import BaseParser
 from backend.normalization.vulnerability_schema import Vulnerability
-from backend.normalization.severity_mapper import map_severity
-from backend.normalization.type_mapper import map_vulnerability_type
+
+logger = logging.getLogger(__name__)
 
 
-def parse_gcc_analyzer_output(raw_output: str) -> List[Vulnerability]:
-    # Determine if raw_output is a file path or direct string content
-    if os.path.exists(raw_output):
-        with open(raw_output, 'r', encoding='utf-8', errors='ignore') as f:
-            content = f.read()
-    else:
-        content = raw_output
+class GCCAnalyzerParser:
+    """
+    Parse GCC -fanalyzer JSON diagnostics into Vulnerability objects.
 
-    if not content.strip():
-        return []
+    AnalysisService calls  safe_parse(path)  where *path* is a temp file
+    containing the merged JSON array written from proc.stderr.
+    """
 
-    findings = []
-    seen = set()
+    TOOL_ID = "gcc_analyzer"
 
-    # Match lines like:
-    #   file.c:42:5: warning: message text [CWE-123] [-Wanalyzer-foo]
-    #   file.c:42:5: warning: message text [-Wanalyzer-foo]
-    # The analyzer flag [-Wanalyzer-...] is always the LAST bracket group.
-    # Everything before it (including optional [CWE-xxx]) is part of the message.
-    pattern = re.compile(
-        r'^(.+?):(\d+)(?::\d+)?:\s+(warning|error|note):\s+(.*?)\s+(\[-Wanalyzer-[^\]]+\])\s*$',
-        re.MULTILINE
-    )
+    # Map GCC diagnostic "kind" → normalised severity label
+    _SEVERITY_MAP = {
+        "warning": "WARNING",
+        "error":   "ERROR",
+        "note":    "INFO",     # notes are context; filtered out below
+    }
 
-    for match in pattern.finditer(content):
-        file_path = match.group(1)
-        line_str = match.group(2)
-        severity_str = match.group(3)
-        message = match.group(4).strip()
-        flags = match.group(5).strip()  # e.g. [-Wanalyzer-null-dereference]
+    def safe_parse(self, path_or_text: str) -> List[Vulnerability]:
+        """
+        Parse GCC JSON diagnostics.  Never raises — returns [] on any error.
 
-        # Deduplicate
-        key = f"{file_path}:{line_str}:{message[:40]}"
-        if key in seen:
-            continue
-        seen.add(key)
+        Parameters
+        ----------
+        path_or_text:
+            Either a file path (written by AnalysisService) containing the
+            JSON array, or the raw JSON string itself.
+        """
+        try:
+            return self._parse(path_or_text)
+        except Exception as exc:
+            logger.exception("[%s] Unexpected parse error: %s", self.TOOL_ID, exc)
+            return []
 
-        # Extract CWE from message (e.g., [CWE-476])
-        cwe_match = re.search(r'\[CWE-(\d+)\]', message, re.IGNORECASE)
-        cwe = f"CWE-{cwe_match.group(1)}" if cwe_match else None
+    # ------------------------------------------------------------------
+    # Internal
+    # ------------------------------------------------------------------
 
-        # Strip the [CWE-xxx] tag from message for cleanliness
-        clean_message = re.sub(r'\s*\[CWE-\d+\]', '', message).strip()
+    def _parse(self, path_or_text: str) -> List[Vulnerability]:
+        raw = self._load(path_or_text)
+        if not raw or not raw.strip():
+            logger.info("[%s] Empty input — no findings.", self.TOOL_ID)
+            return []
 
-        # Extract analyzer type from flags (e.g., -Wanalyzer-null-dereference)
-        type_match = re.search(r'-Wanalyzer-([a-zA-Z0-9_-]+)', flags)
-        analyzer_type = type_match.group(1) if type_match else ""
+        diagnostics = self._load_json(raw)
+        if not diagnostics:
+            return []
 
-        # Severity mapping
-        sev = severity_str.lower()
-        if sev == "error":
-            severity = "High"
-        elif sev == "note":
-            severity = "Info"
-        else:  # warning
-            high_types = ["null-dereference", "use-after-free", "double-free", "buffer-overflow"]
-            severity = "High" if any(t in analyzer_type for t in high_types) else "Medium"
+        findings: List[Vulnerability] = []
+        for diag in diagnostics:
+            vuln = self._diag_to_vulnerability(diag)
+            if vuln is not None:
+                findings.append(vuln)
 
-        vuln_type = map_vulnerability_type(analyzer_type)
+        logger.info("[%s] Parsed %d finding(s).", self.TOOL_ID, len(findings))
+        return findings
 
-        findings.append(
-            Vulnerability(
-                tool="gcc_analyzer",
-                file=file_path,
-                line=int(line_str),
-                vulnerability_type=vuln_type,
-                severity=severity,
-                message=clean_message,
-                cwe=cwe,
+    def _load(self, path_or_text: str) -> str:
+        """Read from a file path, or return the string directly."""
+        p = Path(path_or_text)
+        if p.exists() and p.is_file():
+            try:
+                return p.read_text(encoding="utf-8", errors="ignore")
+            except OSError as exc:
+                logger.warning("[%s] Could not read file %s: %s", self.TOOL_ID, p, exc)
+                return ""
+        # Treat as raw text (e.g. when called directly in tests)
+        return path_or_text
+
+    def _load_json(self, raw: str) -> list:
+        """
+        Parse the JSON array from *raw*.
+
+        GCC may prepend a plain-text "In function …" header before the JSON
+        array when there are hard compilation errors.  Slice to the array.
+        """
+        start = raw.find("[")
+        end   = raw.rfind("]")
+        if start == -1 or end == -1 or end < start:
+            # Could be an empty file ("[]" written when no source files found)
+            stripped = raw.strip()
+            if stripped in ("", "[]"):
+                return []
+            logger.warning(
+                "[%s] No JSON array found in input. First 300 chars:\n%s",
+                self.TOOL_ID, raw[:300],
             )
+            return []
+
+        try:
+            return json.loads(raw[start : end + 1])
+        except json.JSONDecodeError as exc:
+            logger.warning("[%s] JSON decode error: %s", self.TOOL_ID, exc)
+            return []
+
+    def _diag_to_vulnerability(self, diag: dict) -> Optional[Vulnerability]:
+        """Convert one GCC JSON diagnostic dict to a Vulnerability, or None to skip."""
+        kind = diag.get("kind", "warning")
+
+        # Skip 'note' entries — they are context annotations attached to a
+        # parent warning, not independent findings.
+        if kind == "note":
+            return None
+
+        severity = self._SEVERITY_MAP.get(kind, "WARNING")
+        message  = diag.get("message", "")
+        option   = diag.get("option", "")
+
+        # Primary caret location
+        file_path, line_no, col_no = "unknown", 0, 0
+        locations = diag.get("locations", [])
+        if locations:
+            caret     = locations[0].get("caret", {})
+            file_path = caret.get("file", "unknown")
+            line_no   = caret.get("line", 0)
+            col_no    = caret.get("column", 0)
+
+        # CWE number (present for -fanalyzer findings, absent for plain -Wall warnings)
+        cwe_raw = diag.get("metadata", {}).get("cwe")
+        cwe     = int(cwe_raw) if cwe_raw is not None else None
+
+        # Build a human-readable description that includes the flag name
+        description = message
+        if option:
+            description = f"{message}  [{option}]"
+
+        return Vulnerability(
+            tool=self.TOOL_ID,
+            severity=severity,
+            file=file_path,
+            line=line_no,
+            column=col_no,
+            description=description,
+            cwe=cwe,
         )
-
-    return findings
-
-
-class GCCAnalyzerParser(BaseParser):
-    tool_name = "gcc_analyzer"
-
-    def parse(self, raw_data: Any) -> List[Vulnerability]:
-        if not isinstance(raw_data, str):
-            raise ValueError(f"GCCAnalyzerParser expects a string, got {type(raw_data).__name__}")
-        return parse_gcc_analyzer_output(raw_data)

@@ -20,3 +20,5 @@ rich>=13.7.0
 
 # Cross-platform file dialogs & paths
 platformdirs>=4.2.0
+
+flawfinder>=2.0.19
