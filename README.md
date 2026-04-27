@@ -21,8 +21,7 @@ Guide to installing all tools:
 - Confirm successful download by checking in a terminal: cppcheck --version
 
 2) Flawfinder
-- Must have python installed
-- Enter this command into a powershell terminal: python -m pip install flawfinder
+- Automatically installed when running application properly (included when pip install -r requirements.txt inside a virtual environment)
 
 3) gcc Compiler
 - Download from this link: https://github.com/msys2/msys2-installer/releases/download/2026-03-22/msys2-x86_64-20260322.exe
