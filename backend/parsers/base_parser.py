@@ -1,35 +1,3 @@
-"""
-parsers/base_parser.py
-
-Abstract base class for every tool parser in the CodeRisk Analyzer.
-
-Design contract
----------------
-Every concrete parser MUST:
-  1. Set `tool_name` as a class-level constant (e.g. "cppcheck").
-  2. Implement `parse(raw_data)` — accepts tool-specific input, returns
-     a list of Vulnerability objects using the shared schema.
-
-Every concrete parser gets for free (from this base):
-  - `safe_parse()` — a wrapper around `parse()` that catches all
-    exceptions and returns an empty list instead of crashing the pipeline.
-  - `validate()` — checks that every returned Vulnerability has the
-    minimum required fields populated.
-  - `summary()` — a quick count-by-severity breakdown for logging.
-
-Extending to a new tool
------------------------
-    from backend.parsers.base_parser import BaseParser
-    from backend.normalization.vulnerability_schema import Vulnerability
-
-    class FlawfinderParser(BaseParser):
-        tool_name = "flawfinder"
-
-        def parse(self, raw_data: str) -> list[Vulnerability]:
-            # raw_data is whatever FlawfinderRunner hands you
-            ...
-"""
-
 from abc import ABC, abstractmethod
 from typing import Any, List, Dict
 from backend.normalization.vulnerability_schema import Vulnerability

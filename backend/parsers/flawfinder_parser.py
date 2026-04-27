@@ -39,25 +39,6 @@ _SEVERITY_MAP = {
 # ---------------------------------------------------------------------------
 
 def parse_flawfinder_output(output_path: str) -> List[Vulnerability]:
-    """
-    Parse a Flawfinder text output file and return a list of Vulnerability objects.
-
-    Parameters
-    ----------
-    output_path : str
-        Path to the text file produced by:
-            flawfinder --columns --dataonly --quiet /path/to/code
-
-    Returns
-    -------
-    List[Vulnerability]
-        One entry per finding found in the output.
-
-    Raises
-    ------
-    FileNotFoundError : if output_path does not exist.
-    ValueError        : if the file cannot be read.
-    """
     try:
         with open(output_path, 'r', encoding='utf-8', errors='ignore') as f:
             content = f.read()
@@ -65,7 +46,9 @@ def parse_flawfinder_output(output_path: str) -> List[Vulnerability]:
         raise FileNotFoundError(f"Flawfinder output file not found: {output_path}")
     except Exception as exc:
         raise ValueError(f"Failed to read {output_path}: {exc}") from exc
+    return _parse_flawfinder_content(content)
 
+def _parse_flawfinder_content(content: str) -> List[Vulnerability]:
     if not content.strip():
         return []
 
@@ -82,14 +65,10 @@ def parse_flawfinder_output(output_path: str) -> List[Vulnerability]:
         if match:
             file_path    = match.group(1)
             line_num     = int(match.group(2))
-            col_num      = int(match.group(3)) if match.group(3) else 0
             level        = int(match.group(4))
-            category     = match.group(5)           # e.g. "buffer", "race"
-            vuln_func    = match.group(6).strip()   # e.g. "strcpy"
+            category     = match.group(5)
+            vuln_func    = match.group(6).strip()
 
-            # Collect description — may span multiple lines.
-            # Inner loop leaves i pointing at the next header (or past EOF)
-            # so the outer loop will re-evaluate it correctly without skipping.
             description_lines: List[str] = []
             i += 1
             while i < len(lines):
@@ -103,13 +82,11 @@ def parse_flawfinder_output(output_path: str) -> List[Vulnerability]:
                 i += 1
 
             description = " ".join(description_lines).strip()
-
             severity = _SEVERITY_MAP.get(level, "INFO")
 
             cwe_match = _CWE_RE.search(description)
-            cwe = int(cwe_match.group(1)) if cwe_match else None
+            cwe = str(cwe_match.group(1)) if cwe_match else None
 
-            # Prepend the vulnerable function name so the description is self-contained
             full_description = f"{vuln_func}: {description}" if description else vuln_func
 
             findings.append(
@@ -117,11 +94,10 @@ def parse_flawfinder_output(output_path: str) -> List[Vulnerability]:
                     tool="flawfinder",
                     file=file_path,
                     line=line_num,
-                    column=col_num,
+                    vulnerability_type=category,
                     severity=severity,
-                    description=full_description,   # FIX: was 'message='; wrong field name
+                    message=full_description,
                     cwe=cwe,
-                    # FIX: 'vulnerability_type=vuln_type' removed — not a Vulnerability field
                 )
             )
         else:
@@ -135,29 +111,14 @@ def parse_flawfinder_output(output_path: str) -> List[Vulnerability]:
 # ---------------------------------------------------------------------------
 
 class FlawfinderParser(BaseParser):
-    """
-    BaseParser implementation for Flawfinder.
-
-    Usage
-    -----
-        parser = FlawfinderParser()
-        vulns  = parser.safe_parse("/tmp/flawfinder_output.txt")
-
-    What parse() expects
-    --------------------
-    raw_data : str
-        Path to a Flawfinder text output file written by AnalysisService.
-    """
-
     tool_name = "flawfinder"
 
     def parse(self, raw_data: Any) -> List[Vulnerability]:
         if not isinstance(raw_data, str):
-            raise ValueError(
-                f"FlawfinderParser expects a file path (str), "
-                f"got {type(raw_data).__name__}."
-            )
-        if not Path(raw_data).exists():
-            raise FileNotFoundError(f"Flawfinder output file not found: {raw_data}")
-
-        return parse_flawfinder_output(raw_data)
+            raise ValueError(f"FlawfinderParser expects str, got {type(raw_data).__name__}.")
+        p = Path(raw_data)
+        if p.exists() and p.is_file():
+            content = p.read_text(encoding="utf-8", errors="ignore")
+        else:
+            content = raw_data
+        return _parse_flawfinder_content(content)

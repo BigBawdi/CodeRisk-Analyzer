@@ -17,7 +17,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import QThread, pyqtSignal
 from PyQt6.QtGui import QFont
 
-from GUI import CodeRiskAnalyzerGUI
+from frontend.GUI import CodeRiskAnalyzerGUI
 from backend.analysis.analysis_service import AnalysisService, AnalysisResult
 
 logging.basicConfig(
@@ -152,22 +152,8 @@ class CodeRiskAnalyzerApp(CodeRiskAnalyzerGUI):
         lines = []
         summary = result.summary
 
-        lines.append("=" * 60)
-        lines.append(" TOOL RAW OUTPUT")
-        lines.append("=" * 60)
-
-        for tr in result.tool_results:
-            lines.append(f"\n[{tr.tool_id}]")
-            if tr.error:
-                lines.append(f"  ERROR: {tr.error}")
-                continue
-            if hasattr(tr, "raw_output") and tr.raw_output:
-                lines.append(tr.raw_output[:2000])
-            else:
-                lines.append("  (no raw output stored)")
-
         lines.append(f"\nTarget  : {summary['target']}")
-        lines.append(f"Tools   : {', '.join(summary['tools_run']) or 'none'}")
+        lines.append(f"Tool   : {', '.join(summary['tools_run']) or 'none'}")
         if summary["tools_failed"]:
             lines.append(f"Failed  : {', '.join(summary['tools_failed'])}")
         lines.append(f"Findings: {summary['total_findings']}")
@@ -211,7 +197,7 @@ class CodeRiskAnalyzerApp(CodeRiskAnalyzerGUI):
 
         lines.append("\n" + "=" * 60)
         return "\n".join(lines)
-
+    
 
 # ---------------------------------------------------------------------------
 # Entry point

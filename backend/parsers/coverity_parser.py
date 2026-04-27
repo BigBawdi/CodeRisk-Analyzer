@@ -1,37 +1,3 @@
-"""
-parsers/coverity_parser.py
-
-Provides two things:
-
-1. parse_coverity_json(json_path) — standalone function that parses
-   Coverity's JSON output format. Kept separate so it can be tested
-   independently.
-
-2. CoverityParser — a BaseParser subclass that wraps the function above.
-   This is what AnalyzerService (and any future orchestrator) uses.
-
-Coverity output format
-------------------------
-Coverity produces JSON output that typically contains an 'issues' array:
-
-    {
-      "issues": [
-        {
-          "checkerName": "USE_AFTER_FREE",
-          "severity": "High",
-          "description": "Use after free vulnerability...",
-          "strippedFilePath": "/path/to/file.c",
-          "mainEventLineNumber": 42,
-          "cwe": "CWE-416",
-          "impact": "High",
-          "category": "Memory Corruption"
-        }
-      ]
-    }
-
-Alternative formats might use 'warnings' or 'defects' as the root key.
-"""
-
 import json
 import os
 from typing import Any, List, Optional, Dict

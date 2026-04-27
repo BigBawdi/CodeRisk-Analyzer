@@ -137,12 +137,21 @@ def _gcc_analyzer_cmd(target: str, output_path: Optional[str]) -> List[str]:
         "-fdiagnostics-format=json",
         "-Wall", "-Wextra",
         "-c",
-        "-o", "/dev/null",
+        "-o", os.devnull,  # cross-platform null output
         target,
     ]
 
 
-def _coverity_cmd(target: str, output_path: Optional[str]) -> List[str]:
+# Step 1 - build capture
+def _coverity_build_cmd(target: str, output_path: str) -> List[str]:
+    return [
+        "cov-build",
+        "--dir", output_path,
+        "gcc", "-c", target
+    ]
+
+# Step 2 - analyze
+def _coverity_cmd(target: str, output_path: str) -> List[str]:
     return [
         "cov-analyze",
         "--dir", output_path,
@@ -291,8 +300,12 @@ class AnalysisService:
         # Parse output
         try:
             if cfg.output_mode == "file":
-                parse_input = output_path or ""
+                if tool_id == "coverity":
+                    parse_input = os.path.join(output_path, "results.json")
+                else:
+                    parse_input = output_path or ""
             else:
+                # stdout and stderr tools pass raw text directly to the parser
                 parse_input = raw_text or ""
             findings = self._parsers[tool_id].safe_parse(parse_input)
         except Exception as exc:

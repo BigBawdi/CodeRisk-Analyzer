@@ -135,12 +135,13 @@ class GCCAnalyzerParser:
         if option:
             description = f"{message}  [{option}]"
 
+        # GCCAnalyzerParser — fix this block
         return Vulnerability(
             tool=self.TOOL_ID,
             severity=severity,
             file=file_path,
             line=line_no,
-            column=col_no,
-            description=description,
-            cwe=cwe,
+            vulnerability_type=kind,           # was missing
+            message=description,               # was 'description='
+            cwe=str(cwe) if cwe else None,     # schema expects str, not int
         )
