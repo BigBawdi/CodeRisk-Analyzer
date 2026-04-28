@@ -23,7 +23,7 @@ Guide to installing all tools:
 2) Flawfinder
 - Automatically installed when running application properly (included when pip install -r requirements.txt inside a virtual environment)
 
-3) gcc Compiler
+3) GCC Compiler
 - Download from this link: https://github.com/msys2/msys2-installer/releases/download/2026-03-22/msys2-x86_64-20260322.exe
 - Run the installer, and install to the default directory (C:\msys2)
 - After installing, the MSYS2 terminal will run automatically. Enter the following command: pacman -Syu
@@ -37,4 +37,4 @@ Guide to installing all tools:
 - Confirm successful download by checking in a terminal: gcc --version
 
 4) Coverity
-Coverity unfortunately will not work for this project. Coverity is closed-source, and requires a premium to make it work in the command line. Coverity Scan is free, but uses cloud based static analysis instead of command line analysis. Since this project utilizes open-source command line binaries, we were unfortunately unable to make it work with our project.
+- Coverity unfortunately will not work for this project. Coverity is closed-source, and requires a premium to make it work in the command line. Coverity Scan is free, but uses cloud based static analysis instead of command line analysis. Since this project utilizes open-source command line binaries, we were unfortunately unable to make it work with our project.
