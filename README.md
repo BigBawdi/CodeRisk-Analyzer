@@ -37,4 +37,4 @@ Guide to installing all tools:
 - Confirm successful download by checking in a terminal: gcc --version
 
 4) Coverity
-Download from this link: https://scan.coverity.com/download/cxx/win64
+Coverity unfortunately will not work for this project. Coverity is closed-source, and requires a premium to make it work in the command line. Coverity Scan is free, but uses cloud based static analysis instead of command line analysis. Since this project utilizes open-source command line binaries, we were unfortunately unable to make it work with our project.
